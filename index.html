@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quay màu - Ai bị?</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--text:#1d1b18;--muted:#7a756c;--line:#e3ded3;--accent:#e63946;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15130f;--card:#201d18;--text:#f2eee6;--muted:#9a9488;--line:#363229}}
+:root[data-theme="dark"]{--bg:#15130f;--card:#201d18;--text:#f2eee6;--muted:#9a9488;--line:#363229}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.4}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:24px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:16px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-of-type{border-bottom:0}
+.row input{flex:1 1 130px;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px}
+.sw{display:flex;gap:6px;flex-wrap:wrap}
+.sw button{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.sw button.on{border-color:var(--text);box-shadow:0 0 0 2px var(--card) inset}
+.sw button.taken{opacity:.2;cursor:not-allowed}
+.x{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer}
+.ghost{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:10px;padding:8px 12px;cursor:pointer;margin-top:8px;font-size:14px}
+.machine{background:#111;border-radius:18px;padding:16px;text-align:center;border:3px solid #444}
+.reels{display:flex;gap:10px;justify-content:center}
+.reel{flex:1;max-width:120px;background:#000;border-radius:10px;padding:16px 0;font:700 40px/1 ui-monospace,Menlo,Consolas,monospace;border:2px solid #333}
+.reel:nth-child(1){color:#ff5a5a}.reel:nth-child(2){color:#4cff7a}.reel:nth-child(3){color:#5aa0ff}
+.reel.spin{animation:sh .08s infinite}
+@keyframes sh{50%{transform:translateY(3px)}}
+.prev{height:46px;border-radius:10px;margin:14px auto 0;max-width:340px;border:2px solid #444;background:#222;display:flex;align-items:center;justify-content:center;color:#fff;font:600 13px ui-monospace,monospace;text-shadow:0 0 4px #000}
+#go{width:100%;margin-top:14px;padding:14px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-size:18px;font-weight:700;cursor:pointer}
+#go:disabled{opacity:.5;cursor:default}
+.err{color:var(--accent);font-size:13px;min-height:18px;margin-top:8px;text-align:center}
+.res{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:2px solid transparent;margin-bottom:8px;background:var(--bg)}
+.res .dot{width:26px;height:26px;border-radius:50%;flex:none;border:1px solid var(--line)}
+.res .nm{flex:1;font-weight:600}.res .ds{color:var(--muted);font-size:13px}
+.res.lose{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
+.res.lose .tag{display:inline}
+.tag{display:none;background:var(--accent);color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;margin-left:6px}
+.big{text-align:center;font-size:22px;font-weight:800;margin:4px 0 14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎰 Quay màu – Ai bị?</h1>
+  <p class="sub">Nhập tên, chọn màu cho mỗi người rồi bấm quay. Người có màu gần nhất với mã RGB quay ra sẽ bị chọn.</p>
+
+  <div class="card" id="players"></div>
+
+  <div class="machine">
+    <div class="reels">
+      <div class="reel" id="r0">000</div>
+      <div class="reel" id="r1">000</div>
+      <div class="reel" id="r2">000</div>
+    </div>
+    <div class="prev" id="prev">rgb(0, 0, 0)</div>
+    <button id="go">QUAY!</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card" id="result" style="display:none;margin-top:16px"></div>
+</div>
+
+<script>
+const COLORS=[
+ {n:'Đỏ',c:[255,0,0]},{n:'Cam',c:[255,127,0]},{n:'Vàng',c:[255,230,0]},
+ {n:'Lục',c:[0,200,0]},{n:'Lam',c:[0,120,255]},{n:'Chàm',c:[75,0,130]},{n:'Tím',c:[148,0,211]}
+];
+let people=[0,1,2,3,4].map(i=>({name:'',color:i}));
+let spinning=false;
+const $=id=>document.getElementById(id);
+const css=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
+
+function render(){
+  const box=$('players');box.innerHTML='';
+  people.forEach((p,i)=>{
+    const row=document.createElement('div');row.className='row';
+    const inp=document.createElement('input');
+    inp.placeholder='Tên người '+(i+1);inp.value=p.name;
+    inp.oninput=e=>p.name=e.target.value;
+    row.appendChild(inp);
+    const sw=document.createElement('div');sw.className='sw';
+    COLORS.forEach((c,ci)=>{
+      const b=document.createElement('button');
+      b.style.background=css(c.c);b.title=c.n;
+      const taken=people.some((q,qi)=>qi!==i&&q.color===ci);
+      if(p.color===ci)b.className='on';
+      else if(taken)b.className='taken';
+      b.onclick=()=>{if(!taken&&!spinning){p.color=ci;render()}};
+      sw.appendChild(b);
+    });
+    row.appendChild(sw);
+    if(people.length>2){
+      const x=document.createElement('button');x.className='x';x.textContent='×';
+      x.onclick=()=>{if(!spinning){people.splice(i,1);render()}};
+      row.appendChild(x);
+    }
+    box.appendChild(row);
+  });
+  if(people.length<COLORS.length){
+    const a=document.createElement('button');a.className='ghost';a.textContent='+ Thêm người';
+    a.onclick=()=>{
+      const free=COLORS.findIndex((_,ci)=>!people.some(q=>q.color===ci));
+      people.push({name:'',color:free});render();
+    };
+    box.appendChild(a);
+  }
+}
+
+const rnd=()=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%256};
+
+function spin(){
+  if(spinning)return;
+  $('err').textContent='';
+  $('result').style.display='none';
+  spinning=true;$('go').disabled=true;
+  const final=[rnd(),rnd(),rnd()];
+  const stops=[1400,2400,3400];
+  const reels=[0,1,2].map(i=>$('r'+i));
+  const done=[false,false,false];
+  reels.forEach(r=>r.classList.add('spin'));
+  const t0=performance.now();
+  const iv=setInterval(()=>{
+    const el=performance.now()-t0;
+    reels.forEach((r,i)=>{
+      if(el>=stops[i]){
+        if(!done[i]){done[i]=true;r.classList.remove('spin');r.textContent=String(final[i]).padStart(3,'0')}
+      }else r.textContent=String(rnd()).padStart(3,'0');
+    });
+    const cur=reels.map((r,i)=>done[i]?final[i]:+r.textContent);
+    $('prev').style.background=css(cur);
+    $('prev').textContent=css(cur).replace(/,/g,', ');
+    if(done.every(Boolean)){clearInterval(iv);finish(final)}
+  },60);
+}
+
+function finish(rgb){
+  spinning=false;$('go').disabled=false;
+  const list=people.map((p,i)=>{
+    const c=COLORS[p.color];
+    const d=Math.sqrt(c.c.reduce((s,v,k)=>s+(v-rgb[k])**2,0));
+    return{name:p.name.trim()||('Người '+(i+1)),c,d};
+  }).sort((a,b)=>a.d-b.d);
+  const min=list[0].d;
+  const losers=list.filter(x=>Math.abs(x.d-min)<1e-9);
+  let html=`<div class="big">${losers.map(l=>l.name).join(' & ')} bị chọn! 🎯</div>`;
+  list.forEach(x=>{
+    const lose=Math.abs(x.d-min)<1e-9;
+    html+=`<div class="res${lose?' lose':''}"><span class="dot" style="background:${css(x.c.c)}"></span>
+      <span class="nm">${esc(x.name)} <span class="ds">(${x.c.n})</span><span class="tag">BỊ</span></span>
+      <span class="ds">cách ${x.d.toFixed(1)}</span></div>`;
+  });
+  const r=$('result');r.innerHTML=html;r.style.display='block';
+  r.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+const esc=s=>s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+$('go').onclick=spin;
+render();
+</script>
+</body>
+</html>
